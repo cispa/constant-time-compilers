@@ -1,0 +1,32 @@
+{
+  "basedir": ".",
+  "sources": ["verify-16.c"],
+  "function": "crypto_verify_16",
+  "arguments": [
+      {
+          "name": "x",
+          "type": "pointer",
+          "to": {
+              "type": "array",
+              "length": 16,
+              "of": {
+                  "type": "i8",
+                  "secret": true
+              }
+          }
+      },
+      {
+        "name": "y",
+        "type": "pointer",
+        "to": {
+            "type": "array",
+            "length": 16,
+            "of": {
+                "type": "i8",
+                "secret": true
+            }
+        }
+      }
+  ],
+  "ctExpected": true
+}

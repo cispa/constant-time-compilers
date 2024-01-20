@@ -1,0 +1,18 @@
+{
+    "basedir": ".",
+    "sources": ["vuln-fixed-lut.c"],
+    "function": "lookup",
+    "arguments": [
+        {
+            "name": "index",
+            "type": "i32",
+            "secret": true,
+            "value": {
+                "type": "range",
+                "start": 0,
+                "end": 9
+            }
+        }
+    ],
+    "ctExpected": false
+}

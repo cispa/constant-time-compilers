@@ -1,0 +1,46 @@
+{
+    "basedir": ".",
+    "sources": ["aes.c", "%PLBASE/../openssl/precompiled_noasm/libcrypto.%COMP_%COPT.a"],
+    "function": "test_aes_ctr",
+    "headers": ["%PLBASE/../openssl/openssl-git/include"],
+    "flags": ["-fPIC"],
+    "arguments": [
+        {
+            "name": "key",
+            "type": "pointer",
+            "to": {
+                "type": "array",
+                "length": 32,
+                "of": {
+                    "type": "i8",
+                    "secret": true
+                }
+            }
+        },
+        {
+            "name": "iv",
+            "type": "pointer",
+            "to": {
+                "type": "array",
+                "length": 16,
+                "of": {
+                    "type": "i8",
+                    "secret": true
+                }
+            }
+        },
+        {
+            "name": "plain",
+            "type": "pointer",
+            "to": {
+                "type": "array",
+                "length": 32,
+                "of": {
+                    "type": "i8",
+                    "secret": true
+                }
+            }
+        }
+    ],
+    "ctExpected": true
+}

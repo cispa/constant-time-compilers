@@ -1,0 +1,16 @@
+{
+    "sources": ["ct-divisible.c"],
+    "function": "divisible",
+    "arguments": [
+        {
+            "name": "x",
+            "type": "i32",
+            "secret": true
+        },
+        {
+            "name": "y",
+            "type": "i32",
+            "secret": true
+        }
+    ]
+}

@@ -1,0 +1,19 @@
+{
+    "basedir": ".",
+    "sources": ["mul.c",  "%PLBASE/../ct-toolkit/precompiled/libcttk.%COMP_%COPT.a" ],
+    "headers": ["%PLBASE/../ct-toolkit/"],
+    "function": "test_mul",
+    "arguments": [
+        {
+            "name": "x",
+            "type": "i64",
+            "secret": true
+        },
+        {
+            "name": "y",
+            "type": "i64",
+            "secret": true
+        }
+        
+    ]
+}

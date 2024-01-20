@@ -1,0 +1,34 @@
+{
+    "basedir": ".",
+    "sources": ["vuln-complex-choice.c"],
+    "function": "complex_choice",
+    "arguments": [
+        {
+            "name": "cond",
+            "type": "i32",
+            "secret": true
+        },
+        {
+            "name": "x",
+            "type": "pointer",
+            "to": {
+                "type": "i32",
+                "value": {
+                    "type": "range",
+                    "start": 1,
+                    "end": 255
+                },
+                "secret": true
+            }
+        },
+        {
+            "name": "y",
+            "type": "pointer",
+            "to": {
+                "type": "i32",
+                "secret": true
+            }
+        }
+    ],
+    "ctExpected": true
+}

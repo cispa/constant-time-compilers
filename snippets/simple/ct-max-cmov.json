@@ -1,0 +1,18 @@
+{
+    "basedir": ".",
+    "sources": ["ct-max-cmov.c"],
+    "function": "max",
+    "arguments": [
+        {
+            "name": "x",
+            "type": "i32",
+            "secret": true
+        },
+        {
+            "name": "y",
+            "type": "i32",
+            "secret": true
+        }
+    ],
+    "ctExpected": true
+}

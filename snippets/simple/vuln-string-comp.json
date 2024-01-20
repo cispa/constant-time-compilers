@@ -1,0 +1,40 @@
+{
+    "basedir": ".",
+    "sources": ["vuln-string-comp.c"],
+    "function": "checkstr",
+    "arguments": [
+        {
+            "name": "expected",
+            "type": "pointer",
+            "to": {
+                "type": "array",
+                "length": 128,
+                "of": {
+                    "type": "i8",
+                    "secret": true
+                }
+            }
+        },
+        {
+            "name": "actual",
+            "type": "pointer",
+            "to": {
+                "type": "array",
+                "length": 128,
+                "of": {
+                    "type": "i8",
+                    "secret": true
+                }
+            }
+        },
+        {
+            "name": "len",
+            "type": "i32",
+            "value": {
+                "type": "fixed",
+                "value": 32
+            }
+        }
+    ],
+    "ctExpected": false
+}

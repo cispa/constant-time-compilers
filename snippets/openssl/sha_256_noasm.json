@@ -1,0 +1,22 @@
+{
+    "basedir": ".",
+    "sources": ["sha.c", "%PLBASE/../openssl/precompiled_noasm/libcrypto.%COMP_%COPT.a"],
+    "function": "test_sha_256",
+    "headers": ["%PLBASE/../openssl/openssl-git/include"],
+    "flags": ["-fPIC"],
+    "arguments": [
+        {
+            "name": "plain",
+            "type": "pointer",
+            "to": {
+                "type": "array",
+                "length": 32,
+                "of": {
+                    "type": "i8",
+                    "secret": true
+                }
+            }
+        }
+    ],
+    "ctExpected": true
+}

@@ -1,0 +1,51 @@
+{
+    "basedir": ".",
+    "sources": ["hex.c",  "%PLBASE/../ct-toolkit/precompiled/libcttk.%COMP_%COPT.a" ],
+    "headers": ["%PLBASE/../ct-toolkit/"],
+    "function": "test_hex",
+    "arguments": [
+        {
+            "name": "dst",
+            "type": "pointer",
+            "to": {
+                "type": "array",
+                "length": 64,
+                "of": {
+                    "type": "i8",
+                    "secret": true
+                }
+            }
+        },
+        {
+            "name": "dst_len",
+            "type": "i64",
+            "secret": false,
+            "value": {
+                "type": "fixed",
+                "value": 64
+            }
+        },
+        {
+            "name": "src",
+            "type": "pointer",
+            "to": {
+                "type": "array",
+                "length": 32,
+                "of": {
+                    "type": "i8",
+                    "secret": true
+                }
+            }
+        },
+        {
+            "name": "src_len",
+            "type": "i64",
+            "secret": false,
+            "value": {
+                "type": "fixed",
+                "value": 32
+            }
+        }
+        
+    ]
+}

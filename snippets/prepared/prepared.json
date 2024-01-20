@@ -1,0 +1,9 @@
+{
+    "sources": ["sample.c"],
+    "function": "test_prepared",
+    "arguments": null,
+    "preparation": {
+        "size": 8,
+        "function": "prepare_input"
+    }
+}

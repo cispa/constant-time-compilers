@@ -1,0 +1,26 @@
+{
+    "basedir": ".",
+    "sources": [
+        "base64.c",
+        "%PLBASE/../mbedtls/precompiled/libmbedcrypto.%COMP_%COPT.a"
+    ],
+    "function": "test_base64",
+    "headers": [
+        "%PLBASE/../mbedtls/mbedtls-git/include/"
+    ],
+    "arguments": [
+        {
+            "name": "plain",
+            "type": "pointer",
+            "to": {
+                "type": "array",
+                "length": 64,
+                "of": {
+                    "type": "i8",
+                    "secret": true
+                }
+            }
+        }
+    ],
+    "ctExpected": true
+}

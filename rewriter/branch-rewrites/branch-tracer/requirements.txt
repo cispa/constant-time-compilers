@@ -1,0 +1,7 @@
+qiling
+capstone==5.0.0rc2
+click
+pwntools
+gmpy2
+plotly
+dash

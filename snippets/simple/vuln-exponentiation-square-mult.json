@@ -1,0 +1,18 @@
+{
+    "basedir": ".",
+    "sources": ["vuln-exponentiation-square-mult.c"],
+    "function": "power",
+    "arguments": [
+        {
+            "name": "base",
+            "type": "i32",
+            "secret": true
+        },
+        {
+            "name": "exponent",
+            "type": "i32",
+            "secret": true
+        }
+    ],
+    "ctExpected": false
+}

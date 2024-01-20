@@ -1,0 +1,23 @@
+{
+    "basedir": ".",
+    "sources": ["ct-simple-choice.c"],
+    "function": "choice",
+    "arguments": [
+        {
+            "name": "cond",
+            "type": "i32",
+            "secret": true
+        },
+        {
+            "name": "x",
+            "type": "i32",
+            "secret": true
+        },
+        {
+            "name": "y",
+            "type": "i32",
+            "secret": true
+        }
+    ],
+    "ctExpected": true
+}

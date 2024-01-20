@@ -1,0 +1,41 @@
+{
+  "basedir": ".",
+  "sources": ["util-cmp-const.c"],
+  "function": "util-cmp-const",
+  "arguments": [
+      {
+          "name": "a",
+          "type": "pointer",
+          "to": {
+              "type": "array",
+              "length": 32,
+              "of": {
+                  "type": "i8",
+                  "secret": true
+              }
+          }
+      },
+      {
+        "name": "b",
+        "type": "pointer",
+        "to": {
+            "type": "array",
+            "length": 32,
+            "of": {
+                "type": "i8",
+                "secret": true
+            }
+        }
+      },
+      {
+        "name": "size",
+        "type": "i64",
+        "secret": false,
+        "value": {
+            "type": "fixed",
+            "value": 32
+        }
+    }
+  ],
+  "ctExpected": true
+}

@@ -1,0 +1,52 @@
+{
+    "basedir": ".",
+    "sources": ["oram.c",  "%PLBASE/../ct-toolkit/precompiled/libcttk.%COMP_%COPT.a" ],
+    "headers": ["%PLBASE/../ct-toolkit/"],
+    "function": "test_oram",
+    "arguments": [
+        {
+            "name": "arr1",
+            "type": "pointer",
+            "to": {
+                "type": "array",
+                "length": 32,
+                "of": {
+                    "type": "i8",
+                    "secret": true
+                }
+            }
+        },
+        {
+            "name": "arr2",
+            "type": "pointer",
+            "to": {
+                "type": "array",
+                "length": 32,
+                "of": {
+                    "type": "i8",
+                    "secret": true
+                }
+            }
+        },
+        {
+            "name": "len",
+            "type": "i64",
+            "secret": false,
+            "value": {
+                "type": "fixed",
+                "value": 32
+            }
+        },
+        {
+            "name": "ctl_in",
+            "type": "i32",
+            "secret": false,
+            "value": {
+                "type": "range",
+                "start": 0,
+                "end": 1
+            }
+        }
+        
+    ]
+}

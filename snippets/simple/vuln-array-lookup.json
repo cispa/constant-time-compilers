@@ -1,0 +1,39 @@
+{
+    "basedir": ".",
+    "sources": ["vuln-array-lookup.c"],
+    "function": "lookup",
+    "arguments": [
+        {
+            "name": "array",
+            "type": "pointer",
+            "to": {
+                "type": "array",
+                "length": 128,
+                "of": {
+                    "type": "i32",
+                    "secret": true
+                }
+            }
+        },
+        {
+            "name": "index",
+            "type": "i32",
+            "secret": true,
+            "value": {
+                "type": "range",
+                "start": 0,
+                "end": 127
+            }
+        },
+        {
+            "name": "length",
+            "type": "i32",
+            "secret": false,
+            "value": {
+                "type": "fixed",
+                "value": 128
+            }
+        }
+    ],
+    "ctExpected": false
+}

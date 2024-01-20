@@ -1,0 +1,38 @@
+{
+    "basedir": ".",
+    "sources": ["ct-array-lookup.c"],
+    "function": "lookup",
+    "arguments": [
+        {
+            "name": "array",
+            "type": "pointer",
+            "to": {
+                "type": "array",
+                "length": 16,
+                "of": {
+                    "type": "i32",
+                    "secret": true
+                }
+            }
+        },
+        {
+            "name": "index",
+            "type": "i32",
+            "secret": true,
+            "value": {
+                "type": "range",
+                "start": 0,
+                "end": 15
+            }
+        },
+        {
+            "name": "length",
+            "type": "i32",
+            "secret": false,
+            "value": {
+                "type": "fixed",
+                "value": 16
+            }
+        }
+    ]
+}

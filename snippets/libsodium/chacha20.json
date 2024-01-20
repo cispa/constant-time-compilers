@@ -1,0 +1,38 @@
+{
+    "basedir": ".",
+    "sources": [
+        "chacha20.c",
+        "%PLBASE/../libsodium/precompiled/libsodium.%COMP_%COPT.a"
+    ],
+    "function": "test_chacha20",
+    "headers": [
+        "%PLBASE/../libsodium/libsodium-stable/include/"
+    ],
+    "arguments": [
+        {
+            "name": "key",
+            "type": "pointer",
+            "to": {
+                "type": "array",
+                "length": 32,
+                "of": {
+                    "type": "i8",
+                    "secret": true
+                }
+            }
+        },
+        {
+            "name": "plain",
+            "type": "pointer",
+            "to": {
+                "type": "array",
+                "length": 64,
+                "of": {
+                    "type": "i8",
+                    "secret": true
+                }
+            }
+        }
+    ],
+    "ctExpected": true
+}
