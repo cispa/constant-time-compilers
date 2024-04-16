@@ -2,7 +2,7 @@
 source "${DATA_ROOT}/data.sh"
 source "${DATA_COMMON}/DATA_init.sh"
 export FRAMEWORK=ctccp
-export PHASE1_TRACES=${DATA_RUN_COUNT} 
+export PHASE1_TRACES=${DATA_RUN_COUNT} # TODO: MODIFY
 export PHASE2_FIXEDKEYS=3
 export PHASE2_TRACES=10
 export PHASE3_TRACES=20

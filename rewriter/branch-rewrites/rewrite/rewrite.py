@@ -74,9 +74,9 @@ def patch(fn, out, invert = [], always = [], never = []):
                 break
         # invert conditional branch
         if b in invert:
+            patch_jmp = None
             if jmp[0] != "N/A":
                 # find opposite
-                patch_jmp = None
                 for con in conditional:
                     if con[0] == jmp[2]:
                         patch_jmp = con
@@ -120,7 +120,8 @@ def patch(fn, out, invert = [], always = [], never = []):
 @click.argument("out_file")
 @click.argument("trace_dir")
 @click.option('--rewrite-type',type=click.Choice(['SPEC', 'DEBRANCH'], case_sensitive=False))
-def rewrite(binary,out_file,trace_dir,rewrite_type):
+@click.option("--ra", is_flag=True, default=False, help="Rewrite all branchs")
+def rewrite(binary,out_file,trace_dir,rewrite_type,ra):
 
     # Read and group branches by address
     branch_hist = defaultdict(list)
@@ -129,20 +130,33 @@ def rewrite(binary,out_file,trace_dir,rewrite_type):
             addr, taken = line.strip().split(":")
             branch_hist[int(addr,base=16)].append(taken == "True")
 
+    
+
     # Filter for branches that are always or never taken
     always_taken = []
     never_taken = []
-    for addr, branch_list in branch_hist.items():
-        if not any(branch_list):
-            never_taken.append(addr)
-        if all(branch_list):
-            always_taken.append(addr)
+ 
 
-    print(f"[+] Branches that are never taken: {never_taken}")
-    print(f"[+] Branches that are always taken: {always_taken}")
+    if(ra):
+        if(not rewrite_type == "SPEC"):
+            print("All branch rewrite only supported for speculative emulation")
+        else:
+            print("[+] Rewriting all branches")
+            always_taken = list(branch_hist.keys())
+    else: 
+        for addr, branch_list in branch_hist.items():
+            if not any(branch_list):
+                never_taken.append(addr)
+            if all(branch_list):
+                always_taken.append(addr)
+            print(f"[+] Branches that are never taken: {never_taken}")
+            print(f"[+] Branches that are always taken: {always_taken}")
 
     if(rewrite_type == "SPEC"):
         print("[+] Speculative emulation rewrite")
+        os.mkdir(out_file)
+        for idx, addr in enumerate(reversed(never_taken+always_taken)):
+            patch(binary,out_file+f"/spec-{idx}",[addr],[],[])            
     
     if(rewrite_type == "DEBRANCH"):
         print("[+] Debranching rewrite")

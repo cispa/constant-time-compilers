@@ -1,10 +1,11 @@
-from . import Checker, CheckerResult, ctgrind, data, dudect, pitchfork, library
+from . import Checker, CheckerResult, ctgrind, data, dudect, pitchfork, library, coverbench
 
 CHECKER_MODULES: list = [
     dudect, 
     ctgrind, 
     data, 
-    pitchfork
+    pitchfork,
+    coverbench
 ]
 
 def collectCheckers() -> list[Checker]:

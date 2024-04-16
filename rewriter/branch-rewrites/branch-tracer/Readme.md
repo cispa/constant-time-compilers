@@ -25,5 +25,6 @@ Options:
 ```
 
 # Limitations
+- Currently only binaries compiled with `--static` are supported. (should work now but untested)
 - Some instuctions are skipped but the can be manually emulated
 

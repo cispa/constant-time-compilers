@@ -3,109 +3,72 @@ from checkers import CheckerResult
 from label import ArrayArgument, IntegerArgument, PointerArgument, SnippetLabel, ValueConstraint
 from . import Checker, CheckerResult
 import pathlib, subprocess
+import os
+import stat
+from glob import glob  
+from pwn import *
+context.log_level='warn'
 
 BITS_PER_CHAR = 8
 
-# Code to clear state between runs
-CLEAR_CACHES = True
-CACHE_SIZE = 20*1024*1024
-CLEAN_STATE_DUMMY ="""
-void clean_state(){
-    return;
-}
-void clean_state_init(){
+def find_ext(dr, ext):
+    return glob(os.path.join(dr,"*.{}".format(ext)))
 
-}
-"""
-CLEAR_CACHE_FUNC ="""
-const int size = %s; // Allocate 20M. Set much larger then L2
-static char *c;
-void clean_state_init(){
-    c =(char *)malloc(size);
-}
-void clean_state(){
-    for (int i = 0; i < 0xff; i++)
-      for (int j = 0; j < size; j++)
-         c[j] = i*j;
-}
-""" % CACHE_SIZE
+def get_function_name_by_address(elf, target_address):
+    for symbol in elf.symbols:
+        if elf.symbols[symbol] == target_address:
+            return symbol
+    return None
 
-class DudectChecker(Checker):
+
+
+class Coverbench(Checker):
+
+
+
+    def __init__(self,nr_iterations=10000000) -> None:
+        super().__init__()
+        self.nr_iterations = nr_iterations
+
     def identifier(self) -> str:
-        return 'dudect'
+        return 'coverbench'
 
     def is_parralelizeble(self) -> bool:
         return False
 
     def prepareSnippet(self, label: SnippetLabel) -> SnippetLabel:
-        if label.arguments is None or label.preparation is not None:
-            return self.preparePreparedSnippet(label)
-        else:
-            return self.prepareArgumentsSnippet(label)
+        global checker_file
+        checker_file = '#define CHECKER_RANDOM_DEVURANDOM 1\n#include "checker_random.h"\n#include <time.h>\n$FUNC_DECL$\n'
 
-    def preparePreparedSnippet(self, label: SnippetLabel) -> SnippetLabel:
-        checker_file = "#include<stdint.h>\n"
-        checker_file += "#define DUDECT_PREPARATION_FUNCTION %s\n" % label.preparation.function
-        checker_file += "#define DUDECT_PREPARATION_SIZE %d\n" % label.preparation.size
-        checker_file += "void %s(void* data);\n" % label.function_name
-        checker_file += "void %s(void* data);\n" % label.preparation.function
-        checker_file += '#include "checker_dudect.h"\n#include <string.h>\n'
-
-        if(CLEAR_CACHES):
-            checker_file += CLEAR_CACHE_FUNC
-        else:
-            checker_file += CLEAN_STATE_DUMMY
-
-        checker_file += "uint8_t do_one_computation(uint8_t *raw_data) {\n"
-        checker_file += "%s(raw_data);\n}\n" % label.function_name
+        # Constrains
+        vars_to_constrain: list[tuple[str, int, int, ValueConstraint]] = []
         
-        with open(label.basedir / "ctccp_check.c", "w") as f:
-            f.write(checker_file)
-
-        label.header_dirs.append(pathlib.Path(__file__).parent.parent.parent / "checkers" / "common")
-        label.header_dirs.append(pathlib.Path(__file__).parent.parent.parent / "checkers" / "dudect")
-        label.source_files.append(label.basedir / "ctccp_check.c")
-        label.additional_flags.append("-lm")
-        return label
-
-
-
-    def prepareArgumentsSnippet(self, label: SnippetLabel) -> SnippetLabel:
-        # Struct elements: name, type
-        struct_elements: list[str] = []
-
-        # Code lines to append to checker_dudect_fill_struct
-        fill_struct_additions: list[str] = []
-        
-        # Public/Secret elements: name, size, count, constraint
-        secret_elements: list[tuple[str, str, int, ValueConstraint]] = []
-        public_elements: list[tuple[str, str, int, ValueConstraint]] = []          
-
+        # List of secret variables
+        vars_to_protect: list[tuple[str, int]] = []
         arg_counter = 0
         arg_names = []
 
         """Unpacks an array argument and generates matching C code
         """
         def unpackArray(arg: ArrayArgument, sizes_before_orig: list[int]) -> tuple[str, list[int]]:
+            global checker_file
             sizes_before = sizes_before_orig.copy()
             sizes_before.append(arg.length)
 
             if arg.of.getType() == 'integer':
                 int_arg: IntegerArgument = arg.of
                 arg_name = "arg_%d_%d" % (arg_counter, len(sizes_before))
-                base_type = "uint%d_t" % int_arg.bits
-                extended_type = "%s %s" % (base_type, arg_name)
+                checker_file += "uint%d_t %s" % (int_arg.bits, arg_name)
                 elements = 1
                 for size in sizes_before:
                     if size > 0:
-                        extended_type += "[%d]" % size
+                        checker_file += "[%d]" % size
                         elements *= size
-                struct_elements.append(extended_type)
+                checker_file += ";\n"
                 if int_arg.secret:
-                    secret_elements.append((arg_name, "sizeof(%s)" % base_type, elements, int_arg.value))
-                else:
-                    public_elements.append((arg_name, "sizeof(%s)" % base_type, elements, int_arg.value))
-                return (base_type, [arg.length])
+                    vars_to_protect.append((arg_name, elements * int_arg.bits // BITS_PER_CHAR))
+                vars_to_constrain.append((arg_name, int_arg.bits, elements, int_arg.value))
+                return ('uint%d_t' % int_arg.bits, [arg.length])
             elif arg.of.getType() == 'array':
                 arr_arg: ArrayArgument = arg.of
                 (base_type, sizes_after) = unpackArray(arr_arg, sizes_before)
@@ -123,12 +86,13 @@ class DudectChecker(Checker):
 
 
         def unpackPointer(arg: PointerArgument, sizes_before_orig: list[int]) -> tuple[str, list[int]]:
+            global checker_file
             sizes_before = sizes_before_orig.copy()
             sizes_before.append(0)
 
             def generateArrayOfPointers(sizes_remaining: list[int], indices: list[int]):
                 if len(sizes_remaining) == 0:
-                    ref = "&dest->arg_%d_%d" % (arg_counter, len(sizes_before) + len(indices))
+                    ref = "&arg_%d_%d" % (arg_counter, len(sizes_before) + len(indices))
                     for i in indices:
                         ref += "[%d]" % i
                     return ref
@@ -145,31 +109,28 @@ class DudectChecker(Checker):
                 int_arg: IntegerArgument = arg.to
                 arg_data_name = "arg_%d_%d" % (arg_counter, len(sizes_before) + 1)
                 arg_ptr_name = "arg_%d_%d" % (arg_counter, len(sizes_before))
-                base_type = "uint%d_t" % (int_arg.bits)
-                extended_type = "%s %s" % (base_type, arg_data_name)
+                checker_file += "uint%d_t %s" % (int_arg.bits, arg_data_name)
                 elements = 1
                 for size in sizes_before:
                     if size > 0:
-                        extended_type += "[%d]" % size
+                        checker_file += "[%d]" % size
                         elements *= size
-                struct_elements.append(extended_type)
+                checker_file += ";\n"
                 if int_arg.secret:
-                    secret_elements.append((arg_data_name, "sizeof(%s)" % base_type, elements, int_arg.value))
-                else:
-                    public_elements.append((arg_data_name, "sizeof(%s)" % base_type, elements, int_arg.value))
+                    vars_to_protect.append((arg_data_name, elements * int_arg.bits // BITS_PER_CHAR))
+                vars_to_constrain.append((arg_data_name, int_arg.bits, elements, int_arg.value))
                 
-                arg_ptr = "*(%s)" % (arg_ptr_name)
+                arg_ptr_name = "*(%s)" % (arg_ptr_name)
                 for size in sizes_before:
                     if size > 0:
-                        arg_ptr = "(%s)[%d]" % (arg_ptr, size)
+                        arg_ptr_name = "(%s)[%d]" % (arg_ptr_name, size)
 
-                struct_elements.append("uint%d_t %s" % (int_arg.bits, arg_ptr))
-
+                checker_file += "uint%d_t %s = " % (int_arg.bits, arg_ptr_name)
                 def generateArrayOfIntPointers(sizes_bef, indices):
                     while (len(sizes_bef) > 0 and sizes_bef[0] == 0):
                         sizes_bef = sizes_bef[1:]
                     if (len(sizes_bef) == 0):
-                        ref = "&(dest->%s)" % arg_data_name
+                        ref = "&%s" % arg_data_name
                         for i in indices:
                             ref += "[%d]" % i
                         return ref
@@ -182,7 +143,7 @@ class DudectChecker(Checker):
                         arr += generateArrayOfIntPointers(sizes_bef[1:], new_indices)
                     arr += "}"
                     return arr
-                fill_struct_additions.append("dest->%s = %s;\n" % (arg_ptr_name, generateArrayOfIntPointers(sizes_before.copy(), [])))
+                checker_file += generateArrayOfIntPointers(sizes_before.copy(), []) + ";\n"
                 return ('uint%d_t' % int_arg.bits, [0])
             elif arg.to.getType() == 'array':
                 arr_arg: ArrayArgument = arg.to
@@ -199,7 +160,7 @@ class DudectChecker(Checker):
                     while (len(sizes_bef) > 0 and sizes_bef[0] == 0):
                         sizes_bef = sizes_bef[1:]
                     if (len(sizes_bef) == 0):
-                        ref = "&(dest->%s)" % arg_data_name
+                        ref = "&%s" % arg_data_name
                         for i in indices:
                             ref += "[%d]" % i
                         return ref
@@ -212,9 +173,7 @@ class DudectChecker(Checker):
                         arr += generateArrayOfArrPointers(sizes_bef[1:], new_indices)
                     arr += "}"
                     return arr
-    
-                fill_struct_additions.append("dest->%s = %s;\n" % (arg_ptr_name, generateArrayOfArrPointers(sizes_before.copy(), [])))
-
+                
                 all_sizes = sizes_before.copy()
                 all_sizes.extend(sizes_after)
                 for id, size in enumerate(all_sizes):
@@ -222,8 +181,9 @@ class DudectChecker(Checker):
                         arg_ptr_name = "(%s)[%d]" % (arg_ptr_name, size)
                     elif id > len(sizes_before_orig) - 1:
                         arg_ptr_name = "*(%s)" % (arg_ptr_name)
-                
-                struct_elements.append("%s %s" % (base_type, arg_ptr_name))
+
+                checker_file += "%s %s = " % (base_type, arg_ptr_name)
+                checker_file += generateArrayOfArrPointers(sizes_before.copy(), []) + ";\n"
 
                 res = [0]
                 res.extend(sizes_after)
@@ -243,7 +203,7 @@ class DudectChecker(Checker):
                     while (len(sizes_bef) > 0 and sizes_bef[0] == 0):
                         sizes_bef = sizes_bef[1:]
                     if (len(sizes_bef) == 0):
-                        ref = "&(dest->%s)" % arg_data_name
+                        ref = "&%s" % arg_data_name
                         for i in indices:
                             ref += "[%d]" % i
                         return ref
@@ -257,8 +217,6 @@ class DudectChecker(Checker):
                     arr += "}"
                     return arr
                 
-                fill_struct_additions.append("dest->%s = %s;\n" % (arg_ptr_name, generateArrayOfArrPointers(sizes_before.copy(), [])))
-                
                 all_sizes = sizes_before.copy()
                 all_sizes.extend(sizes_after)
                 for id, size in enumerate(all_sizes):
@@ -267,7 +225,8 @@ class DudectChecker(Checker):
                     elif id > len(sizes_before_orig) - 1:
                         arg_ptr_name = "*(%s)" % (arg_ptr_name)
 
-                struct_elements.append("%s %s" % (base_type, arg_ptr_name))
+                checker_file += "%s %s = " % (base_type, arg_ptr_name)
+                checker_file += generateArrayOfArrPointers(sizes_before.copy(), []) + ";\n"
 
                 res = [0]
                 res.extend(sizes_after)
@@ -280,12 +239,10 @@ class DudectChecker(Checker):
         for arg in label.arguments:
             arg_name = "arg_" + str(arg_counter)
             if arg.getType() == 'integer':
-                arg: IntegerArgument = arg
-                struct_elements.append("uint%d_t %s" % (arg.bits, arg_name))
+                checker_file += "volatile uint%d_t %s = 0;\n" % (arg.bits, arg_name)
                 if arg.secret:
-                    secret_elements.append((arg_name, "sizeof(uint%d_t)" % arg.bits, 1, arg.value))
-                else:
-                    public_elements.append((arg_name, "sizeof(uint%d_t)" % arg.bits, 1, arg.value))
+                    vars_to_protect.append((arg_name, arg.bits // BITS_PER_CHAR))
+                vars_to_constrain.append((arg_name, arg.bits, 1, arg.value))
                 arg_names.append(arg_name)
                 arg_types_simplified.append("uint%d_t" % arg.bits)
             elif arg.getType() == 'array':
@@ -297,95 +254,82 @@ class DudectChecker(Checker):
                         break
                 arg_names.append(arg_name + "_" + str(offset))
                 arg_types_simplified.append("void*")
+
             elif arg.getType() == 'pointer':
                 unpackPointer(arg, [])
                 arg_names.append(arg_name + "_1")
                 arg_types_simplified.append("void*")
+
             arg_counter += 1
 
-        checker_file = "#include<stdint.h>\n"
-        checker_file += "typedef struct checker_dudect_args {\n"
-        for element in struct_elements:
-            checker_file += "%s;\n" % element
-        checker_file += "} checker_dudect_args_t;\nchecker_dudect_args_t template;\n"
+        func_decl = "void %s(" % label.function_name
+        for id, arg_type in enumerate(arg_types_simplified):
+            if id > 0:
+                func_decl += ", "
+            func_decl += arg_type
+        func_decl += ");"
+        checker_file = checker_file.replace("$FUNC_DECL$", func_decl)
 
-        checker_file += "uint8_t %s(" % label.function_name
-        for idx, type in enumerate(arg_types_simplified):
-            if idx > 0:
-                checker_file += ", "
-            checker_file += type
-        checker_file += ");\n"
-        
-        checker_file += "#define DUDECT_PUBLIC_VARS %d\n" % len(public_elements)
-        checker_file += '#include "checker_dudect.h"\n#include <string.h>\n'
-
-        if(CLEAR_CACHES):
-            checker_file += CLEAR_CACHE_FUNC
-        else:
-            checker_file += CLEAN_STATE_DUMMY
-
-        checker_file += "void checker_dudect_fill_struct(checker_dudect_args_t* dest, checker_dudect_args_t* copy_src) {\n"
-        checker_file += "memcpy(dest, &template, sizeof(checker_dudect_args_t));\n"
-        for name, size, count, constraint in secret_elements:
-            checker_file += "if (copy_src) {\n"
-            checker_file += "memcpy(&(dest->%s), &(copy_src->%s), sizeof((dest->%s)));\n" % (name, name, name)
-            checker_file += "} else {\n"
+        checker_file += "int main() {\n"
+        checker_file +=  f"for(int itercnt=0; itercnt<{self.nr_iterations}; itercnt++){{\n"
+        for var, elem_bits, elements, constraint in vars_to_constrain:
             if constraint is None:
-                checker_file += "checker_fill_unconstrained((void*) &(dest->%s), %s, %s);\n" % (name, count, size)
+                continue
             elif constraint.getType() == "fixed":
-                checker_file += "checker_fill_fixed((void*) &(dest->%s), %d, %s, %s);\n" % (name, constraint.value, count, size)
+                checker_file += "checker_fill_fixed((void*) &%s, %d, %s, %s);\n" % (var, constraint.value, elements, elem_bits // BITS_PER_CHAR)
             elif constraint.getType() == "range":
-                checker_file += "checker_fill_range((void*) &(dest->%s), %d, %d, %s, %s);\n" % (name, constraint.start, constraint.end, count, size)
-            checker_file += "}\n"
-        for line in fill_struct_additions:
-            checker_file += line
-        checker_file += "}\n"
+                checker_file += "checker_limit_to_bounds_%d((void*) &%s, %d, %d, %d);\n" % (elem_bits, var, elements, constraint.start, constraint.end)
 
-        checker_file += "void checker_dudect_fill_template() {\n"
-        for name, size, count, constraint in public_elements:
-            if constraint is None:
-                checker_file += "checker_fill_unconstrained((void*) &(template.%s), %s, %s);\n" % (name, count, size)
-            elif constraint.getType() == "fixed":
-                checker_file += "checker_fill_fixed((void*) &(template.%s), %d, %s, %s);\n" % (name, constraint.value, count, size)
-            elif constraint.getType() == "range":
-                checker_file += "checker_fill_range((void*) &(template.%s), %d, %d, %s, %s);\n" % (name, constraint.start, constraint.end, count, size)
-        checker_file += "}\n"
-
-        checker_file += "uint8_t do_one_computation(uint8_t *raw_data) {\n"
-        checker_file += "checker_dudect_args_t *data = (void*) raw_data;\n"
-        checker_file += "return %s(" % label.function_name
+        checker_file += "%s(" % label.function_name
         for id, arg_name in enumerate(arg_names):
             if id > 0:
-                checker_file += ", "
-            checker_file += "data->%s" % arg_name
-
-        checker_file += ");\n}\n"
-
+                checker_file += ", " 
+            checker_file += arg_name
         
-        with open(label.basedir / "ctccp_check.c", "w") as f:
+        checker_file += ");};\nreturn 0;\n}\n"
+        
+        with open(label.basedir / "coverbench_check.c", "w") as f:
             f.write(checker_file)
 
-        label.header_dirs.append(pathlib.Path(__file__).parent.parent.parent / "checkers" / "common")
-        label.header_dirs.append(pathlib.Path(__file__).parent.parent.parent / "checkers" / "dudect")
-        label.source_files.append(label.basedir / "ctccp_check.c")
-        label.additional_flags.append("-lm")
+        label.header_dirs.append((pathlib.Path(__file__).parent.parent.parent / "checkers" / "common").resolve())
+        label.source_files.append(label.basedir / "coverbench_check.c")
         return label
 
 
     def runChecker(self, label: SnippetLabel, binary: Path, timeout: int=120) -> CheckerResult:
         try:
+            res =subprocess.check_output(["../bcov/local/bin/bcov", "-m", "patch", "-p", "any", "-v", "1", "-i", str(binary), "-o", f"{str(binary)}.any"])
+            st = os.stat(f"{str(binary)}.any")
+            os.chmod(f"{str(binary)}.any", st.st_mode | stat.S_IEXEC)
+            my_env = os.environ.copy()
+            my_env["LD_PRELOAD"] = "/home/tstuser/2023-ctccp/experiments/bcov/local/lib/libbcov-rt.so"
+            my_env["BCOV_OPTIONS"] = f"coverage_dir={binary.parent}"
             output = subprocess.run(
-                [str(binary)], 
-                #stdout=subprocess.PIPE, 
-                #stderr=subprocess.PIPE,
-                timeout=timeout
+                [f"{str(binary)}.any"], 
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.PIPE,
+                timeout=timeout,
+                env=my_env
             )
-        except subprocess.TimeoutExpired:
-            return CheckerResult(None,True)
-        return CheckerResult(output.returncode == 0, False)
 
+            coverage_res = subprocess.check_output(["../bcov/local/bin/bcov", "-m", "report", "-p", "any", "-i", str(binary), "-d", find_ext(binary.parent,"bcov")[0]])
+
+            elf = ELF(str(binary))
+            for func in filter(lambda x: x.startswith("func"),coverage_res.decode().split("\n")):
+                data_clean = func.replace("func:","").split(",")
+                addr = int("0x"+data_clean[0],base=0)
+
+                fun_name = get_function_name_by_address(elf,addr)
+                covered, total = int(data_clean[-2]), int(data_clean[-1])
+                # Only print functions we actually enter
+                if covered > 0:
+                    print(f"{fun_name}: bb_coveage {data_clean[3]}/{data_clean[4]} {data_clean[2]} instr_coverage {data_clean[6]}/{data_clean[7]} {data_clean[5]}")
+        except subprocess.TimeoutExpired:
+            return CheckerResult(False,False)
+        return CheckerResult(False,False)
+    
 
 def registerCheckers() -> list[Checker]:
     return [
-        DudectChecker()
+        Coverbench()
     ]

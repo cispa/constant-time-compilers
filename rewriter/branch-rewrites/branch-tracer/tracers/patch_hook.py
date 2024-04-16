@@ -1,4 +1,4 @@
-# This is a really diry hack to skip unupported instruction remove or emulate them if needed
+# This is a hack to skip unupported instruction remove or emulate them if needed
 
 
 from qiling import Qiling
@@ -15,9 +15,9 @@ class Patch_Hook:
         
         buf = ql.mem.read(address, size)
         for insn in md.disasm(buf, address):
-            if self.arch == "arm64" and (insn.id == ARM64_INS_CASA or insn.id == ARM64_INS_SWPL):  # TODO: emulate if needed
+            if self.arch == "arm64" and (insn.id == ARM64_INS_CASA or insn.id == ARM64_INS_SWPL):  
                             ql.log.debug("Instruction unsupported, skipping")
                             ql.arch.regs.write("pc", ql.arch.regs.read("pc") + 4)
 
     def patch(self, ql: Qiling, address: int, size: int, data) -> None:
-        pass #TODO: Skip and emulate instructions
+        pass 

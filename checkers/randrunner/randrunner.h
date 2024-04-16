@@ -131,8 +131,6 @@ DUDECT_VISIBILITY int dudect_free(dudect_ctx_t *ctx);
 // kill this
 extern void prepare_inputs(dudect_config_t *c, uint8_t *input_data, uint8_t *classes);
 extern uint8_t do_one_computation(uint8_t *data);
-extern void clean_state();
-extern void clean_state_init();
 
 #endif /* DUDECT_H_INCLUDED */
 
@@ -219,7 +217,7 @@ static void prepare_percentiles(dudect_ctx_t *ctx) {
 }
 
 /* this comes from ebacs */
-void dudect_randombytes(uint8_t *x, size_t how_much) {
+void randombytes(uint8_t *x, size_t how_much) {
   ssize_t i;
   static int fd = -1;
 
@@ -253,7 +251,7 @@ void dudect_randombytes(uint8_t *x, size_t how_much) {
 
 uint8_t randombit(void) {
   uint8_t ret = 0;
-  dudect_randombytes(&ret, 1);
+  randombytes(&ret, 1);
   return (ret & 1);
 }
 
@@ -289,7 +287,6 @@ static int64_t cpucycles(void) {
 
 static void measure(dudect_ctx_t *ctx) {
   for (size_t i = 0; i < ctx->config->number_measurements; i++) {
-    clean_state();
     ctx->ticks[i] = cpucycles();
     do_one_computation(ctx->input_data + i * ctx->config->chunk_size);
   }
@@ -462,8 +459,6 @@ int dudect_init(dudect_ctx_t *ctx, dudect_config_t *conf)
   assert(ctx->classes);
   assert(ctx->input_data);
   assert(ctx->percentiles);
-
-  clean_state_init();
 
   return 0;
 }
